@@ -1,61 +1,37 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from plotsLib import plots
+import random
+import Project
 
-def is_delaunay(p1, p2, p3, p4):
-    """Check if the edge flip is needed to satisfy the Delaunay condition."""
+class triangle():
+    def __init__(self, p1, p2, p3):
+        self.p1 = (p1[0], p1[1])
+        self.p2 = (p2[0], p2[1])
+        self.p3 = (p3[0], p3[1])
+
+class polygon():
+    def __init__(self):
+        self.edges = set()
+
+class edge():
+    def __init__(self, p1, p2):
+        self.p1 = p1
+        self.p2 = p2
+
+def circumcircle(p1, p2, p3, p4):
     ax, ay = p1
     bx, by = p2
     cx, cy = p3
     dx, dy = p4
 
-    # Matrix determinant to check if point p4 lies inside the circumcircle of triangle (p1, p2, p3)
     det = np.linalg.det([
         [ax, ay, ax**2 + ay**2, 1],
         [bx, by, bx**2 + by**2, 1],
         [cx, cy, cx**2 + cy**2, 1],
         [dx, dy, dx**2 + dy**2, 1]
     ])
-    print(f"Checking Delaunay condition for points {p1}, {p2}, {p3}, {p4}: Determinant = {det}")  # Debugging
-    return det <= 0
-
-def edge_flipping(points, edges):
-    """Perform edge flipping to convert the triangulation into a Delaunay triangulation."""
-    edges = edges[:]
-    flipped = True
-
-    while flipped:
-        flipped = False
-        for i, (a, b) in enumerate(edges):
-            # Find triangles sharing the edge (a, b)
-            triangles = []
-            for c in range(len(points)):
-                if c != a and c != b and {a, b, c}.issubset(set(sum(edges, []))):
-                    triangles.append((a, b, c))
-
-            if len(triangles) == 2:
-                (a, b, c1), (a, b, c2) = triangles
-
-                print(f"Checking edge ({a}, {b}) with triangles ({a}, {b}, {c1}) and ({a}, {b}, {c2})")  # Debugging
-
-                if not is_delaunay(points[a], points[b], points[c1], points[c2]):
-                    print(f"Flipping edge ({a}, {b}) to ({c1}, {c2})")  # Debugging
-                    # Flip the edge
-                    edges[i] = (c1, c2)
-                    edges.append((a, c1))
-                    edges.append((b, c2))
-                    flipped = True
-
-        # Debugging: Print the current state of edges after each iteration
-        print(f"Current edges after iteration: {edges}")
-
-        # Remove duplicate edges after flipping
-        edges = list(set(tuple(sorted(edge)) for edge in edges))  # Ensure consistent ordering of edges
-
-    # Debugging: Final state of edges
-    print(f"Final edges: {edges}")
-
-    return edges
+    return det >= 0
 
 def plot_initial_and_delaunay(points, initial_edges, delaunay_edges):
     """Plot the initial triangulation and Delaunay triangulation side by side."""
@@ -84,31 +60,66 @@ def plot_initial_and_delaunay(points, initial_edges, delaunay_edges):
     plt.tight_layout()
     plt.show()
 
-def verify_delaunay(points, edges):
-    """Verify if the given triangulation satisfies the Delaunay condition."""
-    for i, (a, b) in enumerate(edges):
-        for c in range(len(points)):
-            if c != a and c != b:
-                for d in range(len(points)):
-                    if d != a and d != b and d != c:
-                        if not is_delaunay(points[a], points[b], points[c], points[d]):
-                            return False
-    return True
+def generateRandomArray(num_points, num_range):
+    points = []
+    for i in range(num_points):
+        x = random.randint(0,num_range)
+        y = random.randint(0,num_range)
+        points.append((x,y))
+    return points
+    
+def bowyer_waston(points):
+    triangulation = []
+    super_triangle = Project.triangle((-15, -5), (35,-5), (15,50))
+    triangulation.append(super_triangle)
+    i = 0
 
-# Update main function to include verification
+    for point in points:
+        bad_triangles = []
+        for triangle in triangulation:
+            if circumcircle(triangle.p1, triangle.p2, triangle.p3, point):
+                bad_triangles.append(triangle)
+                #print(f"Point {i} in circle")
+                i = i+1
+                #print(f"bad triangle added")
+
+        polygon = Project.polygon()
+        for triangle in bad_triangles:
+            edges = [(triangle.p1,triangle.p2), (triangle.p2, triangle.p3), (triangle.p3, triangle.p1)]
+            #print(edges)
+            for comp_triangle in bad_triangles:
+                comp_edges = [(comp_triangle.p1, comp_triangle.p2), (comp_triangle.p2, comp_triangle.p3), (comp_triangle.p3, comp_triangle.p1)]
+                #print(comp_edges)
+                flag = False
+                for edge in edges:
+                    for comp_edge in comp_edges:
+                        if edge == comp_edge and triangle != comp_triangle:
+                            flag = True
+                    if flag == False:
+                        polygon.edges.add(edge)
+        for triangle in bad_triangles:
+            triangulation.remove(triangle)
+        for edge in polygon.edges:
+            new_tri = Project.triangle(edge[0], edge[1], point)
+            triangulation.append(new_tri)
+    for triangle in triangulation:
+        if triangle.p1 == (-15, -5) or triangle.p2 == (-15, -5) or triangle.p3 == (-15, -5) or triangle.p1 == (35,-5) or triangle.p2 == (35,-5) or triangle.p3 == (35,-5) or triangle.p1 == (15,50) or triangle.p2 == (15,50) or triangle.p3 == (15,50):
+            triangulation.remove(triangle)
+            print(f"Removed: {triangle}")
+            print(f"points: {triangle.p1} {triangle.p2} {triangle.p3}")
+    return triangulation
+
+            
+
 def main():
-    case_num = int(input("Enter the case number (0-10): "))
-    points, edges = plots.plots_select(case_num)
-    delaunay_edges = edge_flipping(points, edges)
-
-    # Verify if the initial triangulation is already Delaunay
-    if verify_delaunay(points, edges):
-        print("The initial triangulation already satisfies the Delaunay condition.")
-    else:
-        print("The initial triangulation does not satisfy the Delaunay condition.")
-
-    # Plot initial and Delaunay triangulations side by side
-    plot_initial_and_delaunay(points, edges, delaunay_edges)
+    num_points = int(input("Enter the number of points: "))
+    points = generateRandomArray(num_points, 20)
+    print(points)
+    trii = bowyer_waston(points)
+    i = 1
+    for tir in trii:
+        print(f"Triangle {i}: {tir.p1} {tir.p2} {tir.p3} {tir}")
+        i = i+1
 
 if __name__ == "__main__":
     main()
